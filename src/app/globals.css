@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/**
+ * 디자인 토큰.
+ * 업무용 UI는 장시간 응시하므로 낮은 채도의 슬레이트 배경 + 틸 단일 강조색으로 구성한다.
+ * (인디고/퍼플 기본 테마는 피한다.)
+ */
+@theme {
+  --color-canvas: #f0f3f4;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f8f9;
+
+  --color-line: #e2e8eb;
+  --color-line-strong: #c9d4d9;
+
+  --color-ink: #0f1c22;
+  --color-ink-soft: #44555e;
+  --color-ink-faint: #84939b;
+
+  --color-brand: #0f766e;
+  --color-brand-dark: #0d5f59;
+  --color-brand-soft: #e6f4f2;
+
+  --color-sidebar: #0f1c22;
+  --color-sidebar-muted: #1a2b33;
+  --color-sidebar-line: #24343c;
+  --color-sidebar-ink: #d7e0e4;
+  --color-sidebar-faint: #7d8f98;
+
+  --color-positive: #047857;
+  --color-positive-soft: #ecfdf5;
+  --color-caution: #b45309;
+  --color-caution-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0369a1;
+  --color-info-soft: #f0f9ff;
+
+  --font-sans: var(--font-noto-sans-kr), "Malgun Gothic", system-ui, sans-serif;
+  --font-display: var(--font-outfit), var(--font-noto-sans-kr), system-ui, sans-serif;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 28 34 / 0.04), 0 1px 3px 0 rgb(15 28 34 / 0.05);
+  --shadow-pop: 0 12px 28px -8px rgb(15 28 34 / 0.16), 0 4px 10px -4px rgb(15 28 34 / 0.08);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 0% -10%, rgb(15 118 110 / 0.07), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgb(3 105 161 / 0.05), transparent 50%),
+    linear-gradient(rgb(15 28 34 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(15 28 34 / 0.025) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
+  background-attachment: fixed;
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@utility card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0.875rem;
+  box-shadow: var(--shadow-card);
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+@keyframes wf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wf-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility animate-fade-up {
+  animation: wf-fade-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-scale-in {
+  animation: wf-scale-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

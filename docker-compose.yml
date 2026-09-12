@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: workflow-db
+    restart: unless-stopped
+    ports:
+      # 로컬에 이미 떠 있는 PostgreSQL(5432/5433) 과 겹치지 않도록 높은 포트를 쓴다.
+      - "55432:5432"
+    environment:
+      POSTGRES_USER: workflow
+      POSTGRES_PASSWORD: workflow
+      POSTGRES_DB: workflow
+    volumes:
+      - workflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow -d workflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  workflow_pgdata:

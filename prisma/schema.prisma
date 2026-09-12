@@ -1,0 +1,389 @@
+// WorkFlow - 중소기업 업무/영업 관리 시스템
+// 상태값은 PostgreSQL enum 대신 String으로 저장하고
+// src/lib/constants.ts 의 유니온 타입 + Zod 스키마로 애플리케이션 레벨에서 강제한다.
+// (역할·권한 정책을 DB enum에 묶지 않아 조직 정책 변경에 유연하다.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 조직 / 계정
+// ---------------------------------------------------------------------------
+
+model Department {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  code        String  @unique
+  description String?
+  costCenter  String?
+
+  users        User[]
+  salesTargets SalesTarget[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  password    String
+  name        String
+  /// ADMIN | MANAGER | SALES | EMPLOYEE
+  role        String    @default("EMPLOYEE")
+  /// ACTIVE | PENDING | SUSPENDED | RESIGNED
+  status      String    @default("PENDING")
+  employeeNo  String?   @unique
+  position    String?
+  phone       String?
+  hireDate    DateTime?
+  avatarColor String    @default("#4f46e5")
+  lastLoginAt DateTime?
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  managerId String?
+  manager   User?   @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports   User[]  @relation("UserManager")
+
+  assignedTasks Task[]         @relation("TaskAssignee")
+  reportedTasks Task[]         @relation("TaskReporter")
+  ownedClients  Client[]       @relation("ClientOwner")
+  ownedDeals    Deal[]
+  consultations Consultation[]
+  comments      TaskComment[]
+  attachments   Attachment[]
+  watching      TaskWatcher[]
+  activityLogs  ActivityLog[]
+  notifications Notification[]
+  salesTargets  SalesTarget[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([role, status])
+  @@index([departmentId])
+}
+
+/// 역할별 권한 매트릭스. 관리자가 UI에서 직접 토글할 수 있도록 DB에 저장한다.
+model RolePermission {
+  id         String  @id @default(cuid())
+  role       String
+  permission String
+  allowed    Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, permission])
+  @@index([role])
+}
+
+// ---------------------------------------------------------------------------
+// 거래처 / 영업
+// ---------------------------------------------------------------------------
+
+model Client {
+  id         String  @id @default(cuid())
+  code       String  @unique
+  name       String
+  businessNo String? @unique
+  ceoName    String?
+  industry   String?
+  /// LARGE | MID | SMALL | STARTUP
+  scale      String  @default("SMALL")
+  /// A | B | C | D
+  grade      String  @default("C")
+  /// PROSPECT | ACTIVE | DORMANT | CHURNED
+  status     String  @default("PROSPECT")
+  phone      String?
+  email      String?
+  website    String?
+  address    String?
+  memo       String?
+
+  ownerId String?
+  owner   User?   @relation("ClientOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  contacts      Contact[]
+  tasks         Task[]
+  deals         Deal[]
+  consultations Consultation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([ownerId])
+}
+
+model Contact {
+  id         String  @id @default(cuid())
+  name       String
+  department String?
+  position   String?
+  phone      String?
+  mobile     String?
+  email      String?
+  isPrimary  Boolean @default(false)
+  memo       String?
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  deals         Deal[]
+  consultations Consultation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([clientId])
+}
+
+model Deal {
+  id    String @id @default(cuid())
+  code  String @unique
+  title String
+
+  amount Float  @default(0)
+  /// LEAD | QUALIFIED | PROPOSAL | NEGOTIATION | WON | LOST
+  stage  String @default("LEAD")
+  /// 0-100. 단계 변경 시 기본값이 자동 반영되며 수동 조정도 가능하다.
+  probability Int @default(10)
+
+  /// NONE | DRAFTING | REVIEW | SIGNED | CANCELLED
+  contractStatus    String    @default("NONE")
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+
+  expectedCloseDate DateTime?
+  closedAt          DateTime?
+  lostReason        String?
+  source            String?
+  memo              String?
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  tasks         Task[]
+  consultations Consultation[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([clientId])
+}
+
+model Consultation {
+  id String @id @default(cuid())
+
+  /// PHONE | VISIT | EMAIL | MEETING | ONLINE
+  type    String
+  title   String
+  content String
+  /// POSITIVE | NEUTRAL | NEGATIVE
+  result  String @default("NEUTRAL")
+
+  consultedAt  DateTime
+  nextAction   String?
+  nextActionAt DateTime?
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([clientId])
+  @@index([consultedAt])
+}
+
+// ---------------------------------------------------------------------------
+// 업무
+// ---------------------------------------------------------------------------
+
+model Task {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  title       String
+  description String?
+
+  /// TODO | IN_PROGRESS | REVIEW | DONE | HOLD
+  status   String @default("TODO")
+  /// LOW | MEDIUM | HIGH | URGENT
+  priority String @default("MEDIUM")
+  /// GENERAL | SALES | SUPPORT | CONTRACT | DEVELOP | CS
+  category String @default("GENERAL")
+  progress Int    @default(0)
+
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  estimatedHours Float?
+  actualHours    Float?
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  reporterId String
+  reporter   User   @relation("TaskReporter", fields: [reporterId], references: [id])
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  comments    TaskComment[]
+  attachments Attachment[]
+  watchers    TaskWatcher[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, priority])
+  @@index([assigneeId])
+  @@index([dueDate])
+}
+
+model TaskComment {
+  id      String @id @default(cuid())
+  content String
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([taskId])
+}
+
+model Attachment {
+  id         String @id @default(cuid())
+  fileName   String
+  storedName String
+  mimeType   String
+  size       Int
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+}
+
+model TaskWatcher {
+  id String @id @default(cuid())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// 운영 / 감사
+// ---------------------------------------------------------------------------
+
+model SalesTarget {
+  id           String @id @default(cuid())
+  year         Int
+  month        Int
+  targetAmount Float  @default(0)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, month, userId, departmentId])
+  @@index([year, month])
+}
+
+model ActivityLog {
+  id String @id @default(cuid())
+
+  /// CREATE | UPDATE | DELETE | LOGIN | LOGOUT | STATUS_CHANGE | PERMISSION_CHANGE | ACCESS_DENIED
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  /// 변경 전/후 스냅샷 JSON 문자열
+  detail     String?
+  ipAddress  String?
+  userAgent  String?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+model Notification {
+  id      String  @id @default(cuid())
+  /// TASK_ASSIGNED | TASK_DUE | TASK_COMMENT | DEAL_STAGE | USER_PENDING | MENTION
+  type    String
+  title   String
+  message String
+  link    String?
+  isRead  Boolean @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
